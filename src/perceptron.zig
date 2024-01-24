@@ -11,19 +11,19 @@ const print = std.debug.print;
 // ideal: use debugger and visualize stack
 
 // NOTE do i need to store the allocator?
-pub fn DataSet(comptime dim: comptime_int, comptime T: type) type {
+pub fn DataSet(comptime T: type) type {
     return struct {
         const Self = @This();
 
         allocator: std.mem.Allocator,
         // TODO multi array list
-        points: std.ArrayList([dim]T),
+        points: std.ArrayList(T),
         dsr: Reader(T),
 
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{
                 .allocator = allocator,
-                .points = std.ArrayList([dim]T).init(allocator),
+                .points = std.ArrayList(T).init(allocator),
                 .dsr = Reader(T){},
             };
         }
@@ -32,7 +32,14 @@ pub fn DataSet(comptime dim: comptime_int, comptime T: type) type {
             this.points.deinit();
         }
 
-        pub fn readFromFile(this: *Self, file: std.fs.File, comptime Layout: type) !void {
+        pub fn readFromFile(
+            this: *Self,
+            file: std.fs.File,
+            comptime Layout: type,
+            // comptime transforms: anytype,
+        ) !void {
+            // TODO
+
             const reader = file.reader();
             while (try reader.readUntilDelimiterOrEofAlloc(this.allocator, '\n', 4096)) |line| {
                 defer this.allocator.free(line);
@@ -42,7 +49,7 @@ pub fn DataSet(comptime dim: comptime_int, comptime T: type) type {
             }
         }
 
-        pub fn parseCSV(this: *Self, s: []const u8, Layout: anytype) ![dim]T {
+        pub fn parseCSV(this: *Self, s: []const u8, Layout: anytype) !T {
             defer this.dsr.clear();
 
             var tokens = std.mem.tokenizeAny(u8, s, ",");
@@ -60,7 +67,7 @@ pub fn DataSet(comptime dim: comptime_int, comptime T: type) type {
 
             const data = this.dsr.data[0..];
             // TODO look at this
-            return @as(*[dim]T, @alignCast(@ptrCast(data))).*;
+            return @as(*T, @alignCast(@ptrCast(data))).*;
         }
     };
 }
@@ -110,12 +117,22 @@ pub fn Perceptron(comptime T: type, comptime dim: comptime_int) type {
             };
         }
 
-        pub fn train(this: *Self, data_set: DataSet(T, dim)) void {
+        pub fn train(this: *Self, data_set: DataSet(T), vector_field: anytype, sign: anytype) void {
             _ = this;
+
+            // TODO handle vector field
+            _ = vector_field;
+
             for (data_set.points) |point| {
-                _ = point;
+                const s = switch (@TypeOf(sign)) {
+                    fn (data_point: T) i8 => sign(point),
+                    // TODO range of bits?
+                    std.meta.Int(.Signed, 8) => sign,
+                    else => @compileError(""),
+                };
+                _ = s;
+
                 // const d = Vec.dot(T, dim, this.w, point.v);
-                // const sign = Vec.mul(T, dim, d, point.sign);
                 // this.w = Vec.add(T, dim, this.w, point.v);
             }
         }
